@@ -1,0 +1,39 @@
+services:
+    # nginx
+    web:
+        image: rasimaghayev/php-nginx:1.0
+        ports:
+            - "80:80"
+    # php
+    app:
+        image: rasimaghayev/php-composer:1.2
+        environment:
+            MYSQL_HOST: db
+            MYSQL_PORT: ${MYSQL_PORT}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+            REDIS_HOST: cache
+            REDIS_PORT: ${REDIS_PORT}
+                # See https://xdebug.org/docs/all_settings#mode
+            XDEBUG_MODE: "${XDEBUG_MODE:-off}"
+        extra_hosts:
+            # Ensure that host.docker.internal is correctly defined on Linux
+            - host.docker.internal:host-gateway
+    # mysql
+    db:
+        image: mysql:latest
+        volumes:
+            - mysqldata:/var/lib/mysql
+        restart: always
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+    # redis
+    cache:
+        image: redis:latest
+
+volumes:
+    mysqldata:
