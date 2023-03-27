@@ -16,7 +16,7 @@ jobs:
               run: composer install --prefer-dist
             - name: Config phpunit Tests
               working-directory: ./app
-              run: /vendor/bin/phpunit --migrate-configuration
+              run: pwd && ls -la
             - name: Run Tests
               working-directory: ./app
               run: composer run-phpunit
