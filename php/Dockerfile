@@ -39,7 +39,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 
 # obtain composer using multi-stage build
 # https://docs.docker.com/build/building/multi-stage/
-COPY --from=composer:2.4 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.6 /usr/bin/composer /usr/bin/composer
 
 #Here, we are copying only composer.json and composer.lock (instead of copying the entire source)
 # right before doing composer install.
