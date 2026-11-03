@@ -1,4 +1,6 @@
 # php-docker
+![Views](https://hits.sh/github.com/RasimAghayev/php-docker.svg?label=views&color=0e75b6)
+
 
 A small "Translate This" demo: pick a language, enter a phrase, get a
 translation back from a MySQL-backed lookup table, cached in Redis. Built
