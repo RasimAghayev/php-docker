@@ -1,24 +1,50 @@
 <?php
-phpinfo();
 
 use App\Repository\TranslationRepository;
+use App\Repository\LanguageRepository;
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
+header('Content-Type: text/html; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+
 $client = \Symfony\Component\Cache\Adapter\RedisAdapter::createConnection(
-    "redis://{$_ENV['REDIS_HOST']}:{$_ENV['REDIS_PORT']}"
+    sprintf(
+        "redis://%s:%s",
+        filter_var($_ENV['REDIS_HOST'] ?? '', FILTER_SANITIZE_SPECIAL_CHARS),
+        filter_var($_ENV['REDIS_PORT'] ?? '6379', FILTER_VALIDATE_INT) ?: 6379
+    )
 );
 
 $cacheAdapter = new \Symfony\Component\Cache\Adapter\RedisAdapter($client);
 
+if (isset($_GET['health'])) {
+    echo json_encode(['status' => 'ok']);
+    exit;
+}
+
+$translation = null;
+$languages = null;
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    $translationCache = new \App\Cache\TranslationCache($cacheAdapter, new TranslationRepository());
-    $translation = $translationCache->findForLanguage($_POST['language'], $_POST['phrase']) ?: 'Translation not found...';
+    $languageId = filter_input(INPUT_POST, 'language', FILTER_VALIDATE_INT);
+    $phrase = filter_input(INPUT_POST, 'phrase', FILTER_SANITIZE_SPECIAL_CHARS);
+
+    if ($languageId === false || $languageId === null || $phrase === false || $phrase === null || $phrase === '') {
+        http_response_code(400);
+        $translation = 'Invalid input. Select a language and enter a phrase.';
+    } else {
+        $translationCache = new \App\Cache\TranslationCache($cacheAdapter, new TranslationRepository());
+        $translation = $translationCache->findForLanguage($languageId, $phrase) ?: 'Translation not found...';
+    }
 
 } else {
 
-    $languageRepository = new \App\Repository\LanguageRepository();
+    $languageRepository = new LanguageRepository();
     $languages = $languageRepository->findAll();
 }
 
@@ -99,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1 class="display-5 fw-bold text-white">Translate This</h1>
         <div class="col-lg-6 mx-auto">
             <?php if ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
-                <p class="fs-5 mb-4"><?php echo $translation; ?></p>
+                <p class="fs-5 mb-4"><?php echo htmlspecialchars($translation ?? '', ENT_QUOTES, 'UTF-8'); ?></p>
                 <a href="/">Translate another</a>
             <?php else: ?>
 
@@ -110,15 +136,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="col">
                             <select name="language" class="form-select" aria-label="Default select example">
                                 <option selected>Select a language</option>
-                                <?php foreach ($languages as $language): ?>
-                                    <option value="<?php echo $language->getId(); ?>">
-                                        <?php echo $language->getName(); ?>
+                                <?php foreach ($languages ?? [] as $language): ?>
+                                    <option value="<?php echo (int) $language->getId(); ?>">
+                                        <?php echo htmlspecialchars($language->getName(), ENT_QUOTES, 'UTF-8'); ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col">
-                            <input name="phrase" type="text" class="form-control" placeholder="Phrase" aria-label="Phrase">
+                            <input name="phrase" type="text" class="form-control" placeholder="Phrase" aria-label="Phrase"
+                                   maxlength="255">
                         </div>
                         <div class="d-grid gap-2">
                             <button class="btn btn-outline-info" type="submit">Translate</button>

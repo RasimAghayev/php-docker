@@ -16,13 +16,11 @@ class TranslationCache
         $this->repository = $repository;
     }
 
-    public function findForLanguage($languageId, $phrase): ?string
+    public function findForLanguage(int $languageId, string $phrase): ?string
     {
         $key = sprintf("translation;%d;%s", $languageId, $phrase);
 
         return $this->cache->get($key, function (\Symfony\Contracts\Cache\ItemInterface $item) use ($languageId, $phrase) {
-
-            echo "Adding $phrase to cache...";
 
             return $this->repository->findForLanguage($languageId, $phrase);
         });
