@@ -34,7 +34,11 @@ app/src/
   Model/
     Language.php, Translation.php -- plain data holders
 app/tests/
-  LanguageTest.php          -- 1 trivial PHPUnit test
+  LanguageTest.php          -- 4 unit tests (TABLE constant, getId/getName,
+                                private visibility)
+  TranslationCacheTest.php  -- 4 unit tests (cache miss/hit, independent keys,
+                                null cached; ArrayAdapter, no Redis)
+  TranslationLookupTest.php -- MySQL-backed integration test (skips without DB)
 sql/docker-php.sql          -- language + translation tables, 3 languages × 1 row (never auto-loaded)
 nginx/Dockerfile, conf.d/default.conf   -- nginx + fastcgi config
 php/Dockerfile, conf.d/xdebug.ini       -- multi-stage PHP-FPM image (app / app_dev)
