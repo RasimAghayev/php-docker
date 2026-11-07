@@ -62,7 +62,7 @@ services:
 
   # redis — cache
   cache:
-    image: redis:7.2@sha256:placeholder
+    image: redis:7.2@sha256:5b816bb37d9707a70f10ef5002ecf8ee431750d397010fc4314c93dca887962f
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 30s
