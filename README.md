@@ -13,7 +13,7 @@ work out of the box.
 
 | Component | Version (as built) |
 |---|---|
-| PHP | 8.2.12-fpm (Alpine), extensions: intl, zip, apcu, opcache, pdo_mysql |
+| PHP | 8.5.11-fpm (Alpine), extensions: intl, zip, apcu, opcache, pdo_mysql |
 | Web | nginx (`latest`), fastcgi to `app:9000` |
 | DB | MySQL (`latest`) |
 | Cache | Redis (`latest`), via `symfony/cache`'s `RedisAdapter` + `predis/predis` |
@@ -23,7 +23,7 @@ work out of the box.
 Images `rasimaghayev/php-nginx:1.0` and `rasimaghayev/php-composer:1.2`
 referenced in `docker-compose.yaml` are this repo's own images, built and
 pushed by `.github/workflows/deploy.yaml` from `nginx/Dockerfile` and
-`php/Dockerfile` on every push to `master` — not third-party images.
+`php/Dockerfile` on every push to `main` — not third-party images.
 
 ## Architecture style
 

@@ -2,26 +2,41 @@ name: TranslateThis
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 jobs:
-    build:
+    test:
         runs-on: ubuntu-latest
+        working-directory: ./app
         steps:
-            - uses: actions/checkout@v7
+            - uses: actions/checkout@v4.2.2
+            - name: Setup PHP 8.4 (symfony/cache v8 requires PHP >=8.4)
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  extensions: pdo, pdo_mysql, intl, zip, apcu, opcache
+                  coverage: none
             - name: Install Composer Dependencies
-              working-directory: ./app
               run: composer install --prefer-dist
             - name: Config phpunit Tests
-              working-directory: ./app
               run: vendor/bin/phpunit --migrate-configuration
             - name: Run Tests
-              working-directory: ./app
               run: composer run-phpunit
-            - run: docker build -t rasimaghayev/php-nginx:1.0 -f ./nginx/Dockerfile .
-            - run: docker build --target app -t rasimaghayev/php-composer:1.2 -f ./php/Dockerfile .
-            - run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
-            - run: docker push rasimaghayev/php-composer:1.2
-            - run: docker push rasimaghayev/php-nginx:1.0 
+
+    build:
+        needs: test
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4.2.2
+            - name: Build nginx image
+              run: docker build -t rasimaghayev/php-nginx:1.0 -f ./nginx/Dockerfile .
+            - name: Build PHP composer image
+              run: docker build --target app -t rasimaghayev/php-composer:1.2 -f ./php/Dockerfile .
+            - name: Login to Docker Hub
+              run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+            - name: Push PHP composer image
+              run: docker push rasimaghayev/php-composer:1.2
+            - name: Push nginx image
+              run: docker push rasimaghayev/php-nginx:1.0
