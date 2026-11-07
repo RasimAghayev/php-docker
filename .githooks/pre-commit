@@ -7,8 +7,9 @@ set -e
 PATTERN='(api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=]|secret[[:space:]]*[:=]|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]+|-----BEGIN [A-Z ]+ KEY)'
 
 # Files that legitimately contain env-var references or placeholders
-# (not literal secrets): compose files and .env.example.
-SKIP='(\.env\.example$|docker-compose\.(dev\.)?yaml$|\.env\.local$)'
+# (not literal secrets): compose files, .env files, and GitHub Actions
+# workflows (which use ${{ secrets.X }} references, not literal values).
+SKIP='(\.env\.example$|docker-compose\.(dev\.)?yaml$|\.env\.local$|\.github/workflows/.+\.ya?ml$)'
 
 STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 if [ -z "$STAGED" ]; then
