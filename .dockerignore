@@ -1,0 +1,13 @@
+.git
+.gitignore
+.gitattributes
+.githooks
+.env
+.env.local
+.env.*
+app/vendor/
+docs/.phpunit.cache/
+*.log
+*.tmp
+.phpunit.cache/
+coverage/

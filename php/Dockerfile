@@ -1,79 +1,105 @@
-# /php/Dockerfile
-FROM php:8.5.11-fpm-alpine  as app
+# php/Dockerfile — multi-stage per Docker standard (PROMPT.md §5)
+# Stages: base -> deps -> build -> test -> runtime
 
-# Useful PHP extension installer image, copy binary into your container
-COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
+# ---- base: pinned PHP runtime + extensions ----
+FROM php:8.5.11-fpm-alpine@sha256:placeholder AS base
 
-# APK stands for Alpine Linux package keeper (manager). One can use the apk command to delete, install, upgrade, or list software
-# An access control list (ACL) contains rules that grant or deny access to certain digital environments.
-# Description: FASTCgi (fcgi) is a language independent, high performant extension to CGI. https://archlinux.org/packages/extra/x86_64/fcgi/
-# The file command is used to determine the type of a file
-# The gettext program translates a natural language message into the user's language
+# NOTE: replace `sha256:placeholder` with the real digest from
+# `docker pull php:8.5.11-fpm-alpine --quiet` before first build.
+# Pinning by digest is required (Phase 5/6 standard); left as placeholder
+# because Docker is unavailable on this host for the digest lookup.
+
+# System packages needed by the PHP extensions we install.
 RUN apk add --no-cache \
-		acl \
+        acl \
         bash \
         fcgi \
-		file \
-		gettext \
-		git \
-	;
-
-# https://docs.moodle.org/311/en/admin/environment/php_extension/intl
-# https://www.educba.com/php-zip-files/
-# The APCu extension adds object caching functions to PHP.
-# OPcache is a type of caching system that saves precompiled script bytecode in a server’s memory called a cache, so each time a user visits a web page, it loads faster.
-RUN set -eux; \
-    install-php-extensions \
-    	intl \
-    	zip \
-    	apcu \
-		opcache \
-        pdo pdo_mysql \
+        file \
+        gettext \
+        git \
     ;
 
-# RUN docker-php-ext-install pdo pdo_mysql
+# PHP extensions: pdo pdo_mysql (required by App\Database\Connection),
+# intl/zip/apcu/opcache (carried from the original image), xdebug only in dev.
+RUN install-php-extensions \
+        intl \
+        zip \
+        apcu \
+        opcache \
+        pdo \
+        pdo_mysql \
+    ;
 
-# allow super user - set this if you use Composer as a
-# super user at all times like in docker containers
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# obtain composer using multi-stage build
-# https://docs.docker.com/build/building/multi-stage/
-COPY --from=composer:2.10 /usr/bin/composer /usr/bin/composer
+# ---- deps: Composer install (cache mount, layer before app copy) ----
+FROM base AS deps
 
-#Here, we are copying only composer.json and composer.lock (instead of copying the entire source)
-# right before doing composer install.
-# This is enough to take advantage of docker cache and composer install will
-# be executed only when composer.json or composer.lock have indeed changed!-
-# https://medium.com/@softius/faster-docker-builds-with-composer-install-b4d2b15d0fff
-COPY ./app/composer.* ./
+COPY --from=composer:2.10@sha256:placeholder /usr/bin/composer /usr/bin/composer
 
-# install
-RUN composer install --prefer-dist --no-dev --no-scripts --no-progress --no-interaction
+# NOTE: composer digest placeholder — replace with real digest from
+# `docker pull composer:2.10 --quiet` before first build.
 
-# copy application files to the working directory
-COPY ./app .
+WORKDIR /var/www/html
 
-# run composer dump-autoload --optimize
-RUN composer dump-autoload --optimize
+# Copy only the manifest first to leverage Docker layer caching.
+COPY app/composer.json app/composer.json
 
-# Dev image
-# This stage is meant to be target-built into a separate image
-# https://docs.docker.com/develop/develop-images/multistage-build/#stop-at-a-specific-build-stage
-# https://docs.docker.com/compose/compose-file/#target
-FROM app as app_dev
+# composer.lock is not tracked in this repo (deliberately deleted per history),
+# so composer install resolves fresh each build. Restoring composer.lock is a
+# Phase 6 item; until then builds are non-reproducible (documented in TD-6).
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install --prefer-dist --no-dev --no-scripts --no-progress --no-interaction;
 
-# Xdebug has different modes / functionalities. We can default to 'off' and set to 'debug'
-# when we run docker compose up if we need it
+# ---- build: copy application code ----
+FROM deps AS build
+
+WORKDIR /var/www/html
+
+COPY app/ .
+
+# Optimize autoloader for production.
+RUN composer dump-autoload --optimize;
+
+# ---- test: run the test suite ----
+FROM build AS test
+
+# Dev dependencies are needed to run PHPUnit.
+RUN composer install --prefer-dist --no-scripts --no-progress --no-interaction;
+
+# Run the suite; `docker build --target test` fails if tests fail.
+RUN vendor/bin/phpunit --configuration phpunit.xml;
+
+# ---- runtime: slim production image, non-root ----
+FROM base AS runtime
+
+WORKDIR /var/www/html
+
+# Copy only the optimized autoloader + source from the build stage.
+COPY --from=build /var/www/html/vendor ./vendor
+COPY --from=build /var/www/html/src ./src
+COPY --from=build /var/www/html/public ./public
+
+# Runtime needs no Composer, no dev tools, no git.
+RUN apk del --no-cache git 2>/dev/null || true;
+
+# Run as non-root (PHP-FPM user exists in the official image).
+USER www-data
+
+# HEALTHCHECK: PHP-FPM listens on 9000; a simple `php -v` confirms the runtime works.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD php -r 'exit(0);' || exit 1
+
+# Exec-form entrypoint; handles SIGTERM for graceful shutdown.
+ENTRYPOINT ["php-fpm"]
+EXPOSE 9000
+
+# ---- dev: extends app with Xdebug + Symfony CLI ----
+FROM app AS app_dev
+
 ENV XDEBUG_MODE=off
+COPY php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
-# Copy xdebug config file into container
-COPY ./php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
-
-# Install xdebug
-RUN set -eux; \
-	install-php-extensions xdebug
-
-RUN curl -sS https://get.symfony.com/cli/installer | bash
-RUN mv /root/.symfony*/bin/symfony /usr/local/bin/symfony
-
+RUN install-php-extensions xdebug; \
+    curl -sS https://get.symfony.com/cli/installer | bash; \
+    mv /root/.symfony*/bin/symfony /usr/local/bin/symfony

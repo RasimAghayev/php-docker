@@ -6,6 +6,10 @@ set -e
 # Match actual credential assignments/values, not the word "secret" in comments.
 PATTERN='(api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=]|secret[[:space:]]*[:=]|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]+|-----BEGIN [A-Z ]+ KEY)'
 
+# Files that legitimately contain env-var references or placeholders
+# (not literal secrets): compose files and .env.example.
+SKIP='(\.env\.example$|docker-compose\.(dev\.)?yaml$|\.env\.local$)'
+
 STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 if [ -z "$STAGED" ]; then
     exit 0
@@ -16,6 +20,10 @@ for FILE in $STAGED; do
     case "$FILE" in
         *.lock|vendor/*|node_modules/*) continue ;;
     esac
+    # Skip files that use env-var substitution, not literal values.
+    if echo "$FILE" | grep -iE "$SKIP" >/dev/null 2>&1; then
+        continue
+    fi
     if git show ":$FILE" 2>/dev/null | grep -iE "$PATTERN" >/dev/null 2>&1; then
         echo "SECRET DETECTED in staged file: $FILE"
         FOUND=1

@@ -1,39 +1,80 @@
 services:
-    # nginx
-    web:
-        image: rasimaghayev/php-nginx:1.0
-        ports:
-            - "80:80"
-    # php
-    app:
-        image: rasimaghayev/php-composer:1.2
-        environment:
-            MYSQL_HOST: db
-            MYSQL_PORT: ${MYSQL_PORT}
-            MYSQL_USER: ${MYSQL_USER}
-            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-            MYSQL_DATABASE: ${MYSQL_DATABASE}
-            REDIS_HOST: cache
-            REDIS_PORT: ${REDIS_PORT}
-                # See https://xdebug.org/docs/all_settings#mode
-            XDEBUG_MODE: "${XDEBUG_MODE:-off}"
-        extra_hosts:
-            # Ensure that host.docker.internal is correctly defined on Linux
-            - host.docker.internal:host-gateway
-    # mysql
-    db:
-        image: mysql:latest
-        volumes:
-            - mysqldata:/var/lib/mysql
-        restart: always
-        environment:
-            MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
-            MYSQL_USER: ${MYSQL_USER}
-            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-            MYSQL_DATABASE: ${MYSQL_DATABASE}
-    # redis
-    cache:
-        image: redis:latest
+  # nginx — serves the PHP frontend, fastcgi to app:9000
+  web:
+    image: php-docker:web
+    ports:
+      - "20140:80"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  # php — PHP-FPM application runtime
+  app:
+    image: php-docker:app
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: ${MYSQL_PORT}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      REDIS_HOST: cache
+      REDIS_PORT: ${REDIS_PORT}
+      XDEBUG_MODE: "${XDEBUG_MODE:-off}"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(0);"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    extra_hosts:
+      - host.docker.internal:host-gateway
+
+  # mysql — database
+  db:
+    image: mysql:8.4@sha256:placeholder
+    volumes:
+      - mysqldata:/var/lib/mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$$MYSQL_USER", "-p$$MYSQL_PASSWORD"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # redis — cache
+  cache:
+    image: redis:7.2@sha256:placeholder
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 volumes:
-    mysqldata:
+  mysqldata:
+
+# NOTE: `sha256:placeholder` digests must be replaced with real digests
+# from `docker pull <image> --quiet` before first build (Phase 5/6 pinning
+# standard). Docker is unavailable on this host, so digests are pending.
+# COMPOSE_PROJECT_NAME=php-docker-p5 (set in Makefile; port block 20140-20149
+# reserved in projects/info/state/ports.md).
