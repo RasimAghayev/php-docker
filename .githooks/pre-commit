@@ -1,0 +1,31 @@
+#!/bin/sh
+# Pre-commit secret scan — blocks commits that add secret-shaped values.
+# Runs against staged blobs only (worktree-safe, no full clone needed).
+set -e
+
+# Match actual credential assignments/values, not the word "secret" in comments.
+PATTERN='(api[_-]?key[[:space:]]*[:=]|password[[:space:]]*[:=]|secret[[:space:]]*[:=]|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]+|-----BEGIN [A-Z ]+ KEY)'
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+FOUND=0
+for FILE in $STAGED; do
+    case "$FILE" in
+        *.lock|vendor/*|node_modules/*) continue ;;
+    esac
+    if git show ":$FILE" 2>/dev/null | grep -iE "$PATTERN" >/dev/null 2>&1; then
+        echo "SECRET DETECTED in staged file: $FILE"
+        FOUND=1
+    fi
+done
+
+if [ "$FOUND" -eq 1 ]; then
+    echo "Commit blocked: secret-shaped value found in staged files."
+    echo "Use env vars / secret manager instead; never commit real credentials."
+    exit 1
+fi
+
+exit 0

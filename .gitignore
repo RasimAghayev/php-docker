@@ -118,4 +118,13 @@ fabric.properties
 
 .idea
 
-app/vendor
+# Composer dependencies (installed in Docker image, never committed)
+app/vendor/
+
+# Environment files (real secrets never committed)
+.env
+.env.local
+.env.*
+
+# Docs build artifacts
+docs/.phpunit.cache/
