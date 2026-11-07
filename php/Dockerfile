@@ -2,7 +2,7 @@
 # Stages: base -> deps -> build -> test -> runtime
 
 # ---- base: pinned PHP runtime + extensions ----
-FROM php:8.5.11-fpm-alpine@sha256:placeholder AS base
+FROM php:8.5.11-fpm-alpine@sha256:fa01fb1645cd0fc566a5f146b099adace33b906571f972f71f2182a7c12d1cd7 AS base
 
 # NOTE: replace `sha256:placeholder` with the real digest from
 # `docker pull php:8.5.11-fpm-alpine --quiet` before first build.
