@@ -35,7 +35,7 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 # ---- deps: Composer install (cache mount, layer before app copy) ----
 FROM base AS deps
 
-COPY --from=composer:2.11@sha256:8de2184c6de224f4689e8f80ed5f5edaf0030b6b8b7839a22a2bcb6722ac87d0 /usr/bin/composer /usr/bin/composer
+COPY --from=composer:2.11@sha256:50ea4d33fdcde1adb0f045547295faa1548b33872e5f789dae5b02ce2fb5de93 /usr/bin/composer /usr/bin/composer
 
 # NOTE: composer digest placeholder — replace with real digest from
 # `docker pull composer:2.10 --quiet` before first build.
