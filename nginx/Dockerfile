@@ -1,4 +1,4 @@
-FROM nginx:latest@sha256:165ddde8751e75a1c907d24ef10d9f6deb08b57e0fe56caf67512486aff76d82
+FROM nginx:latest@sha256:6a3df739b6312289e87d70947d900669c1b3087474ece5814b9c01bbf2e6dde3
 
 # NOTE: replace `sha256:placeholder` with the real digest from
 # `docker pull nginx:latest --quiet` before first build (Phase 5/6 pinning
